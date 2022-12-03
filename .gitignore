@@ -38,7 +38,8 @@ vignettes/*.pdf
 # R Environment Variables
 .Renviron
 
-inputs/*.csv
+inputs/*/*.csv
+inputs/*/*.pdf
 outputs/*.png
 
 .DS_Store
