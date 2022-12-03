@@ -40,3 +40,5 @@ vignettes/*.pdf
 
 inputs/*.csv
 outputs/*.png
+
+.DS_Store
