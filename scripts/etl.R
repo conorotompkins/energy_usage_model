@@ -18,3 +18,15 @@ bill_data <- bill_pdfs |>
   unnest(usage_stats) |> 
   mutate(bill_date = mdy(bill_date)) |> 
   arrange(bill_date)
+
+#read in duquesne light data
+energy_df <- list.files("inputs/duquesne_light", pattern = ".csv", full.names = TRUE) |> 
+  map_dfr(~read_csv(.x, skip = 4)) |> 
+  clean_names() |> 
+  mutate(date_time = str_c(date, start_time, sep = " "),
+         date_time = ymd_hms(date_time),
+         year = year(date),
+         month = month(date, label = T, abbr = FALSE),
+         dow = wday(date, label = T),
+         start_hour = hour(start_time)) |> 
+  mutate(year = as.factor(year))
