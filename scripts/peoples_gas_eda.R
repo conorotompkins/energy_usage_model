@@ -17,7 +17,6 @@ extract_usage <- function(x){
     mutate(mcf = str_remove_all(mcf, "\\s"),
            mcf = str_remove(mcf, "MCF")) |> 
     mutate(price_cost = str_remove(price_cost, "\\s")) |> 
-    #mutate(price_cost = str_replace(price_cost, "\\s", "_")) |> 
     separate(price_cost, into = c("price", "cost"), sep = "\\s", remove = TRUE) |> 
     mutate(across(c(mcf, price, cost), parse_number)) |> 
     select(-c(name, value))
