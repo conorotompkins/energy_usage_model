@@ -15,6 +15,24 @@ extract_mcf <- function(x){
   
 }
 
+extract_bill_date <- function(x){
+  
+  x <- pdf_text(x)
+  
+  x <- str_split(x, "\n")[1]
+  
+  x |> 
+    map(str_squish) |> 
+    unlist() |> 
+    enframe() |> 
+    filter(name == 6) |> 
+    mutate(value = str_remove(value, "^\\d+"),
+           value = str_remove(value, "^\\s"),
+           value = str_sub(value, 1, 12)) |> 
+    mutate(value = mdy(value)) 
+  
+}
+
 list.files("inputs/peoples_gas", pattern = ".pdf", full.names = TRUE) |> 
   set_names() |> 
   map_dfr(extract_mcf, .id = "bill_id") |> 
@@ -45,4 +63,10 @@ test_split |>
   map(str_squish) |> 
   unlist() |> 
   enframe() |> 
-  filter(str_detect(value, "MCF @"))
+  filter(name == 6) |> 
+  mutate(value = str_remove(value, "^\\d+"),
+         value = str_remove(value, "^\\s"),
+         value = str_sub(value, 1, 12)) |> 
+  mutate(value = mdy(value)) |> 
+  pull(value)
+  
