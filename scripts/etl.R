@@ -19,6 +19,9 @@ bill_data <- bill_pdfs |>
   mutate(bill_date = mdy(bill_date)) |> 
   arrange(bill_date)
 
+bill_data |> 
+  write_csv("inputs/clean_data/gas.csv")
+
 #read in duquesne light data
 energy_df <- list.files("inputs/duquesne_light", pattern = ".csv", full.names = TRUE) |> 
   map_dfr(~read_csv(.x, skip = 4)) |> 
@@ -30,3 +33,6 @@ energy_df <- list.files("inputs/duquesne_light", pattern = ".csv", full.names = 
          dow = wday(date, label = T),
          start_hour = hour(start_time)) |> 
   mutate(year = as.factor(year))
+
+energy_df |> 
+  write_csv("inputs/clean_data/electricity.csv")
