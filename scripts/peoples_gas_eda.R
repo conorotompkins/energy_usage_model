@@ -30,11 +30,19 @@ extract_bill_date <- function(x){
   
   x <- str_split(x, "\n")[1]
   
+  date_location <- x |> 
+    map(str_squish) |> 
+    unlist() |> 
+    enframe() |> 
+    filter(str_detect(value, "^Account Number")) |> 
+    slice_head(n = 1) |> 
+    pull(name)
+  
   x |> 
     map(str_squish) |> 
     unlist() |> 
     enframe() |> 
-    filter(name == 6) |> 
+    filter(name == date_location + 1) |> 
     mutate(value = str_remove(value, "^\\d+"),
            value = str_remove(value, "^\\s"),
            value = str_sub(value, 1, 12)) |> 
@@ -48,13 +56,19 @@ bill_pdfs <- list.files("inputs/peoples_gas", pattern = ".pdf", full.names = TRU
   select(name) |> 
   rename(bill_id = name)
 
-bill_pdfs |> 
+bill_data <- bill_pdfs |> 
   mutate(bill_date = map_chr(bill_id, extract_bill_date)) |> 
   mutate(usage_stats = map(bill_id, extract_usage)) |> 
-  unnest(usage_stats)
+  unnest(usage_stats) |> 
+  mutate(bill_date = mdy(bill_date)) |> 
+  arrange(bill_date)
+
+bill_data |> 
+  ggplot(aes(bill_date, mcf)) +
+  geom_line()
 
 bill_pdfs |> 
-  filter(row_number() == 1) |> 
+  filter(row_number() == 4) |> 
   pull() |> 
   extract_bill_date()
 
@@ -62,6 +76,28 @@ bill_pdfs |>
   filter(row_number() == 1) |> 
   pull() |> 
   extract_usage()
+
+date_location <- bill_pdfs |> 
+  filter(row_number() == 4) |> 
+  pull(bill_id) |> 
+  pdf_text() |>
+  str_split("\n") |> 
+  map(str_squish) |> 
+  unlist() |> 
+  enframe() |> 
+  filter(str_detect(value, "^Account Number")) |> 
+  slice_head(n = 1) |> 
+  pull(name)
+
+bill_pdfs |> 
+  filter(row_number() == 4) |> 
+  pull(bill_id) |> 
+  pdf_text() |>
+  str_split("\n") |> 
+  map(str_squish) |> 
+  unlist() |> 
+  enframe() |> 
+  filter(row_number() == date_location + 1)
 
 #get usage stats
 bill_pdfs |> 
