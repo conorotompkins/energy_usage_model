@@ -92,3 +92,33 @@ combined_usage |>
   ggplot(aes(date, usage, color = type)) +
   geom_line() +
   facet_wrap(vars(type), scales = "free_y", ncol = 1)
+
+#model
+combined_usage_ts <- combined_usage |> 
+  mutate(ym = yearmonth(date)) |> 
+  as_tsibble(key = type, index = ym)
+
+combined_usage_ts |> 
+  scan_gaps()
+
+test_model <- combined_usage_ts |> 
+  model(arima = ARIMA(log(usage + 1)),
+        lm = TSLM(log(usage + 1) ~ trend() + season()))
+
+forecasts <- test_model |> 
+  forecast(h = "6 months") |> 
+  bind_rows(combined_usage_ts |> 
+              rename(yvar = usage)) |> 
+  mutate(yvar = coalesce(yvar, .mean)) |> 
+  mutate(upper = hilo(usage)$upper,
+         lower = hilo(usage)$lower) |>
+  arrange(type, ym) |> 
+  replace_na(list(.model = "actual"))
+
+forecasts |> 
+  ggplot(aes(ym, yvar, color = .model, fill = .model)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = .1) +
+  geom_line(aes(lty = .model != "actual")) +
+  facet_wrap(vars(type), scales = "free_y", ncol = 1) +
+  scale_fill_manual(values = c("black", "#F8766D", "#00BFC4")) +
+  scale_color_manual(values = c("black", "#F8766D", "#00BFC4"))
