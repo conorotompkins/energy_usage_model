@@ -77,3 +77,18 @@ gas_df |>
   mutate(year = as.factor(year)) |> 
   ggplot(aes(month, mcf, color = year, group = year)) +
   geom_line()
+
+#combined
+combined_usage <- energy_df |> 
+  group_by(type, year, month) |> 
+  summarize(usage = sum(usage)) |> 
+  bind_rows(gas_df |> 
+              select(type, year, month, mcf) |> 
+              rename(usage = mcf)) |> 
+  mutate(date = str_c(year, month, "01", sep = "-"),
+         date = ymd(date))
+
+combined_usage |> 
+  ggplot(aes(date, usage, color = type)) +
+  geom_line() +
+  facet_wrap(vars(type), scales = "free_y", ncol = 1)
