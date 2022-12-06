@@ -65,8 +65,15 @@ dow_df |>
   theme_bw()
 
 #peoples gas
-gas_df <- read_csv("inputs/clean_data/gas.csv")
+gas_df <- read_csv("inputs/clean_data/gas.csv") |> 
+  mutate(year = year(bill_date),
+         month = month(bill_date, label = TRUE, abbr = FALSE))
 
 gas_df |> 
   ggplot(aes(bill_date, mcf)) +
+  geom_line()
+
+gas_df |> 
+  mutate(year = as.factor(year)) |> 
+  ggplot(aes(month, mcf, color = year, group = year)) +
   geom_line()
