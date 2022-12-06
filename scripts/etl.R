@@ -17,7 +17,9 @@ bill_data <- bill_pdfs |>
   mutate(usage_stats = map(bill_id, extract_usage)) |> 
   unnest(usage_stats) |> 
   mutate(bill_date = mdy(bill_date)) |> 
-  arrange(bill_date)
+  arrange(bill_date) |> 
+  mutate(type = "Gas usage") |> 
+  select(type, everything())
 
 bill_data |> 
   write_csv("inputs/clean_data/gas.csv")
