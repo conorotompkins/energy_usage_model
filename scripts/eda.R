@@ -23,13 +23,18 @@ glimpse(energy_df)
 #total timeline
 energy_df |>
   ggplot(aes(date_time, usage)) +
-  geom_point(alpha = .1, size = .3) +
+  geom_point(alpha = .01, size = .3) +
   geom_smooth(span = .1) +
-  geom_smooth(method = "lm")
+  geom_smooth(method = "lm", lty = 2)
 
 energy_df |>
   ggplot(aes(date_time, usage)) +
   geom_density2d_filled()
+
+energy_df |>
+  ggplot(aes(date_time, usage)) +
+  geom_hex() +
+  scale_fill_viridis_c()
 
 energy_df |>
   ggplot(aes(x = date_time, y = usage)) +
