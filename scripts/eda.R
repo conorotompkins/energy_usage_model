@@ -4,6 +4,8 @@ library(tsibble)
 library(janitor)
 library(lubridate)
 library(ragg)
+library(scales)
+library(plotly)
 
 options(scipen = 999, digits = 4, use.ragg = TRUE)
 
@@ -87,43 +89,118 @@ gas_df |>
 combined_usage <- energy_df |> 
   group_by(type, year, month) |> 
   summarize(usage = sum(usage)) |> 
+  ungroup() |> 
   bind_rows(gas_df |> 
               select(type, year, month, mcf) |> 
               rename(usage = mcf)) |> 
   mutate(date = str_c(year, month, "01", sep = "-"),
          date = ymd(date))
 
+combined_usage <- combined_usage |> 
+  mutate(ym = yearmonth(date)) |> 
+  mutate(wfh_flag = case_when(ym >= yearmonth("2020-03-01") ~ TRUE,
+                              ym < yearmonth("2020-03-01") ~ FALSE),
+         new_ac_flag = case_when(ym >= yearmonth("2019-10-01") ~ TRUE,
+                                 ym < yearmonth("2019-10-01") ~ FALSE))
+
 combined_usage |> 
-  ggplot(aes(date, usage, color = type)) +
+  group_by(wfh_flag) |> 
+  summarize(first_date = min(ym),
+            last_date = max(ym))
+
+combined_usage |> 
+  group_by(new_ac_flag) |> 
+  summarize(first_date = min(ym),
+            last_date = max(ym))
+
+combined_usage |> 
+  ggplot(aes(date, usage)) +
   geom_line() +
+  geom_vline(xintercept = ymd("2020-03-01"), lty = 2) +
+  geom_vline(xintercept = ymd("2019-10-01"), lty = 2) +
   facet_wrap(vars(type), scales = "free_y", ncol = 1)
 
 #model
 combined_usage_ts <- combined_usage |> 
-  mutate(ym = yearmonth(date)) |> 
   as_tsibble(key = type, index = ym)
 
 combined_usage_ts |> 
   scan_gaps()
 
 test_model <- combined_usage_ts |> 
-  model(arima = ARIMA(log(usage + 1)),
-        lm = TSLM(log(usage + 1) ~ trend() + season()))
+  model(lm = TSLM(log(usage + 1) ~ trend() + season()),
+        arima = ARIMA(log(usage + 1)),
+        arima_wfh = ARIMA(log(usage + 1) ~ wfh_flag),
+        arima_new_ac = ARIMA(log(usage + 1) ~ new_ac_flag),  
+        arima_context = ARIMA(log(usage + 1) ~ wfh_flag + new_ac_flag)
+        )
 
-forecasts <- test_model |> 
-  forecast(h = "6 months") |> 
+test_model |> 
+  glance() |> 
+  view()
+
+test_model |> 
+  tidy() |> 
+  view()
+
+future_hypothetical <- new_data(combined_usage_ts, n = 12) |> 
+  mutate(wfh_flag = TRUE,
+         new_ac_flag = TRUE)
+
+#compare basic models
+basic_forecasts <- test_model |> 
+  forecast(new_data = future_hypothetical) |> 
   bind_rows(combined_usage_ts |> 
               rename(yvar = usage)) |> 
   mutate(yvar = coalesce(yvar, .mean)) |> 
   mutate(upper = hilo(usage)$upper,
          lower = hilo(usage)$lower) |>
   arrange(type, ym) |> 
-  replace_na(list(.model = "actual"))
+  replace_na(list(.model = "actual")) |> 
+  filter(.model %in% c("actual", "lm", "arima"))
 
-forecasts |> 
+colors_needed <- basic_forecasts |> 
+  distinct(.model) |> 
+  nrow() - 1
+
+show_col(palette)
+
+palette <- c("black", hue_pal()(colors_needed))
+
+basic_forecasts |> 
   ggplot(aes(ym, yvar, color = .model, fill = .model)) +
   geom_ribbon(aes(ymin = lower, ymax = upper), alpha = .1) +
   geom_line(aes(lty = .model != "actual")) +
   facet_wrap(vars(type), scales = "free_y", ncol = 1) +
-  scale_fill_manual(values = c("black", "#F8766D", "#00BFC4")) +
-  scale_color_manual(values = c("black", "#F8766D", "#00BFC4"))
+  scale_fill_manual(values = palette) +
+  scale_color_manual(values = palette)
+
+#compare models with context
+context_forecasts <- test_model |> 
+  forecast(new_data = future_hypothetical) |> 
+  bind_rows(combined_usage_ts |> 
+              rename(yvar = usage)) |> 
+  mutate(yvar = coalesce(yvar, .mean)) |> 
+  mutate(upper = hilo(usage)$upper,
+         lower = hilo(usage)$lower) |>
+  arrange(type, ym) |> 
+  replace_na(list(.model = "actual")) |> 
+  filter(str_detect(.model, "actual|arima"))
+
+colors_needed <- context_forecasts |> 
+  distinct(.model) |> 
+  nrow() - 1
+
+show_col(palette)
+
+palette <- c("black", hue_pal()(colors_needed))
+
+fc_plot <- context_forecasts |> 
+  ggplot(aes(ym, yvar, color = .model, fill = .model)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = .1) +
+  geom_line(aes(lty = .model != "actual")) +
+  facet_wrap(vars(type), scales = "free_y", ncol = 1) +
+  scale_fill_manual(values = palette) +
+  scale_color_manual(values = palette)
+
+ggplotly(fc_plot)
