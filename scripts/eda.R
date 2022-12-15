@@ -164,9 +164,9 @@ colors_needed <- basic_forecasts |>
   distinct(.model) |> 
   nrow() - 1
 
-show_col(palette)
-
 palette <- c("black", hue_pal()(colors_needed))
+
+show_col(palette)
 
 basic_forecasts |> 
   ggplot(aes(ym, yvar, color = .model, fill = .model)) +
@@ -192,9 +192,9 @@ colors_needed <- context_forecasts |>
   distinct(.model) |> 
   nrow() - 1
 
-show_col(palette)
-
 palette <- c("black", hue_pal()(colors_needed))
+
+show_col(palette)
 
 fc_plot <- context_forecasts |> 
   ggplot(aes(ym, yvar, color = .model, fill = .model)) +
@@ -227,9 +227,9 @@ energy_ts |>
 
 energy_model <- energy_ts |> 
   model(arima = ARIMA(log(usage + 1)),
-        arima_k2 = ARIMA(log(usage + 1) ~ fourier(K = 2))#,
+        arima_k2 = ARIMA(log(usage + 1) ~ fourier(K = 2)),
         #arima_k3 = ARIMA(log(usage + 1) ~ fourier(K = 3)),
-        #arima_k4 = ARIMA(log(usage + 1) ~ fourier(K = 4))
+        arima_k4 = ARIMA(log(usage + 1) ~ fourier(K = 4))
         )
 
 energy_model |> 
