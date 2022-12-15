@@ -1,6 +1,7 @@
 library(tidyverse)
 library(fable)
 library(tsibble)
+library(fabletools)
 library(janitor)
 library(lubridate)
 library(ragg)
@@ -204,3 +205,74 @@ fc_plot <- context_forecasts |>
   scale_color_manual(values = palette)
 
 ggplotly(fc_plot)
+
+#special model for hourly energy
+#for some reason there are duplicates for 1 AM on some dates. did the rate change mid-hour?
+energy_df |> 
+  duplicates(key = type, index = date_time)
+
+energy_ts <- energy_df |>
+  group_by(type, date_time) |> 
+  summarize(usage = mean(usage)) |> 
+  ungroup() |> 
+  as_tsibble(key = type, index = date_time) |> 
+  fill_gaps(usage = 0)
+
+energy_ts |> 
+  scan_gaps()
+
+energy_ts |> 
+  as_tibble() |> 
+  filter(ymd(str_sub(date_time, 1, 10)) == ymd("2019-03-10"))
+
+energy_model <- energy_ts |> 
+  model(arima = ARIMA(log(usage + 1)),
+        arima_k2 = ARIMA(log(usage + 1) ~ fourier(K = 2))#,
+        #arima_k3 = ARIMA(log(usage + 1) ~ fourier(K = 3)),
+        #arima_k4 = ARIMA(log(usage + 1) ~ fourier(K = 4))
+        )
+
+energy_model |> 
+  glance()
+
+energy_model |> 
+  tidy()
+
+energy_model |> 
+  accuracy()
+
+energy_fc <- energy_model |> 
+  forecast(h = "1 month") |> 
+  bind_rows(energy_ts |> 
+              rename(yvar = usage)) |> 
+  mutate(yvar = coalesce(yvar, .mean)) |> 
+  mutate(upper = hilo(usage)$upper,
+         lower = hilo(usage)$lower) |>
+  arrange(type, date_time) |> 
+  replace_na(list(.model = "actual")) |> 
+  filter(.model %in% c("actual", "arima_k2"))
+
+colors_needed <- energy_fc |> 
+  distinct(.model) |> 
+  nrow() - 1
+
+palette <- c("black", hue_pal()(colors_needed))
+
+show_col(palette)
+
+energy_fc_plot <- energy_fc |> 
+  filter(date_time >= max(energy_ts$date_time) - months(1)) |> 
+  ggplot(aes(date_time, yvar, color = .model, fill = .model)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = .1) +
+  #geom_point(alpha = .1, size = .3) +
+  geom_line() +
+  facet_wrap(vars(type), scales = "free_y", ncol = 1) +
+  scale_fill_manual(values = palette) +
+  scale_color_manual(values = palette)
+
+energy_fc_plot
+
+forecast(energy_model, new_data(energy_ts, n = 24*7)) %>%
+  autoplot(energy_ts |> 
+             filter(date_time >= max(energy_ts$date_time) - months(1))) +
+  facet_wrap(vars(.model))
