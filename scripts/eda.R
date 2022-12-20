@@ -7,6 +7,7 @@ library(lubridate)
 library(ragg)
 library(scales)
 library(plotly)
+library(tictoc)
 
 options(scipen = 999, digits = 4, use.ragg = TRUE)
 
@@ -225,12 +226,14 @@ energy_ts |>
   as_tibble() |> 
   filter(ymd(str_sub(date_time, 1, 10)) == ymd("2019-03-10"))
 
+tic()
 energy_model <- energy_ts |> 
   model(arima = ARIMA(log(usage + 1)),
         arima_k2 = ARIMA(log(usage + 1) ~ fourier(K = 2)),
         #arima_k3 = ARIMA(log(usage + 1) ~ fourier(K = 3)),
         arima_k4 = ARIMA(log(usage + 1) ~ fourier(K = 4))
         )
+toc()
 
 energy_model |> 
   glance()
