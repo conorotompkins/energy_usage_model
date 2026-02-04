@@ -17,6 +17,7 @@ energy_df <- read_csv("inputs/clean_data/electricity.csv") |>
   mutate(
     date_time = str_c(date, start_time, sep = " "),
     date_time = ymd_hms(date_time),
+    date_ym = yearmonth(date),
     year = year(date),
     month = month(date, label = T, abbr = FALSE),
     dow = wday(date, label = T),
@@ -75,12 +76,48 @@ dow_df |>
 
 #compare yearmonth
 energy_df |>
-  mutate(date_ym = yearmonth(date)) |>
+  filter(date_ym != yearmonth(Sys.Date())) |>
   summarize(usage = sum(usage), .by = date_ym) |>
   ggplot(aes(date_ym, usage)) +
-  #geom_line() +
-  geom_point() +
-  theme(axis.text.y = element_blank())
+  geom_line() +
+  geom_point()
+
+year_comparison <- energy_df |>
+  filter(date_ym != yearmonth(Sys.Date())) |>
+  summarize(usage = sum(usage), .by = c(year, month))
+
+recent_years <- year_comparison |>
+  filter(year >= 2025)
+
+ggplot(
+  data = year_comparison,
+  aes(
+    x = month,
+    y = usage,
+    group = year
+  )
+) +
+  geom_line(color = "lightgrey") +
+  geom_line(
+    data = recent_years,
+    aes(
+      x = month,
+      y = usage,
+      color = as.factor(year),
+      group = year
+    ),
+    lwd = 1
+  ) +
+  geom_point(
+    data = recent_years |> filter(year == 2026),
+    aes(
+      x = month,
+      y = usage,
+      color = as.factor(year),
+      group = year
+    ),
+    lwd = 1
+  )
 
 #peoples gas
 gas_df <- read_csv("inputs/clean_data/gas.csv") |>
